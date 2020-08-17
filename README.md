@@ -19,6 +19,10 @@ pip install pillow
 ### 文档
 
 ```
+python cbg_bench.py -h
+```
+
+```
 + 选项：
   -h, --help     帮助
   -v, --version  程序版本
