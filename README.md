@@ -2,9 +2,11 @@
 
 [![Developing](https://img.shields.io/badge/Developing-200817-brightgreen.svg)](https://github.com/nguaduot/yys-cbg-bench)
 
-[阴阳师藏宝阁](https://yys.cbg.163.com/)衍生小工具，用于提取游戏帐号要点并生成报告。目前仍处于开发阶段。报告例：
+[阴阳师藏宝阁](https://yys.cbg.163.com/)衍生小工具，用于提取游戏帐号要点并生成报告。目前仍处于开发阶段。例：
 
-[完整结果](sample/cbg_全平台互通新区_初心未改_南瓜多糖_20200710132623_bench.png) | [精简结果](sample/cbg_全平台互通新区_初心未改_南瓜多糖_20200710132623_bench_lite.png)
+商品页面：[阴阳师藏宝阁-初心未改-南瓜多糖](https://yys.cbg.163.com/cgi/mweb/equip/28/202006230501616-28-2KCLGHIJVPTIL)
+
+生成报告：[完整结果](sample/cbg_全平台互通新区_初心未改_南瓜多糖_20200710132623_bench.png) | [精简结果](sample/cbg_全平台互通新区_初心未改_南瓜多糖_20200710132623_bench_lite.png)
 
 ### 依赖
 
