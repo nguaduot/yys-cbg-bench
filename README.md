@@ -1,6 +1,7 @@
 # 号来
 
-[![Release](https://img.shields.io/badge/Release-210128-brightgreen.svg)](https://github.com/nguaduot/yys-cbg-bench)
+[![Release](https://img.shields.io/badge/Release-1.6-brightgreen.svg)](https://github.com/nguaduot/yys-cbg-bench)
+[![Download](https://img.shields.io/badge/Download-EXE-brightgreen.svg)](dist/%E5%8F%B7%E6%9D%A51.6.exe)
 
 [阴阳师藏宝阁](https://yys.cbg.163.com/)衍生小工具，用于提取游戏帐号要点并生成图文报告。
 
@@ -8,7 +9,7 @@
 
 例：
 
-商品页面：[阴阳师藏宝阁-初心未改-南瓜多糖](https://yys.cbg.163.com/cgi/mweb/equip/21/202101152201616-21-VTG7H9VQQFVSG)
+商品页面：[阴阳师藏宝阁-夏之蝉-南瓜多糖](https://yys.cbg.163.com/cgi/mweb/equip/21/202101152201616-21-VTG7H9VQQFVSG)
 
 生成报告：[完整结果](sample/cbg_中国区-iOS_夏之蝉_南瓜多糖_20210122225748_bench.png) | [精简结果](sample/cbg_中国区-iOS_夏之蝉_南瓜多糖_20210122225748_bench_lite.png)
 
