@@ -7,14 +7,15 @@
 #
 # 了解更多请前往 GitHub 查看项目：https://github.com/nguaduot/yys-pick-dwarf
 #
-# + 支持读取 NGA@火电太热 的「御魂导出器」导出的JSON数据文件
-#   https://nga.178.com/read.php?tid=15220479
-# + 支持读取 NGA@fluxxu 的「痒痒熊快照」导出的JSON数据文件
+# + 支持读取 NGA@火电太热 的「御魂导出器 for 新客户端」导出的 JSON 数据文件
+#   https://nga.178.com/read.php?tid=23251576
+# + 支持读取 NGA@fluxxu 的「痒痒熊快照」导出的 JSON 数据文件
 #   https://nga.178.com/read.php?tid=16557282
+# + 支持读取藏宝阁数据
 #
 # author: @nguaduot 痒痒鼠@南瓜多糖
-# version: 3.0.200811
-# date: 20200811
+# version: 3.2.210128
+# date: 20210128
 
 
 import copy
@@ -32,8 +33,8 @@ from urllib import request
 
 PROG = 'yys-pick-dwarf'
 AUTH = 'nguaduot'
-VER = '3.0'
-VERSION = '3.0.200811'
+VER = '3.2'
+VERSION = '3.2.210128'
 REL = 'github.com/nguaduot/yys-pick-dwarf'
 COPYRIGHT = '%s v%s @%s %s' % (PROG, VERSION, AUTH, REL)
 HELP = '''+ 选项：
@@ -45,22 +46,41 @@ HELP = '''+ 选项：
 + 若未指定 -d，程序会读取未知参数，若也无未知参数，不启动程序
 + 不带任何参数也可启动程序，会有参数输入引导'''
 
-KINDS = (
-    '兵主部', '狂骨', '阴摩罗', '心眼', '鸣屋', '狰', '轮入道', '蝠翼',
-    '青女房', '针女', '镇墓兽', '破势', '伤魂鸟', '网切', '三味',
-    '涂佛', '树妖', '薙魂', '钟灵', '镜姬', '被服', '涅槃之火', '地藏像',
-    '魅妖', '珍珠', '木魅', '日女巳时', '反枕', '招财猫', '雪幽魂',
-    '飞缘魔', '蚌精', '火灵',
-    '幽谷响', '返魂香', '骰子鬼', '魍魉之匣',
-    '鬼灵歌伎', '蜃气楼', '地震鲶', '荒骷髅', '胧车', '土蜘蛛'
-)  # 全部御魂类型（截至当前版本，43 种）
+# TODO: 以下常量需留意随版本更新而检查更新
+# 如何检查更新？
+# GET https://cbg-yys.res.netease.com/js/game_auto_config.js
+# data['yuhun_list']
+KINDS = {
+    # 两件套：攻击加成
+    300074: '兵主部', 300048: '狂骨', 300027: '阴摩罗', 300022: '心眼',
+    300020: '鸣屋', 300018: '狰', 300012: '轮入道', 300004: '蝠翼',
+    # 两件套：暴击
+    300075: '青女房', 300036: '针女', 300031: '镇墓兽', 300030: '破势',
+    300029: '伤魂鸟', 300026: '网切', 300007: "三味",
+    # 两件套：生命加成
+    300076: '涂佛', 300024: '树妖', 300021: '薙魂', 300015: '钟灵',
+    300014: '镜姬', 300009: '被服', 300006: '涅槃之火', 300003: '地藏像',
+    # 两件套：防御加成
+    300035: '魅妖', 300032: '珍珠', 300023: '木魅', 300013: '日女巳时',
+    300011: '反枕', 300010: '招财猫', 300002: '雪幽魂',
+    # 两件套：效果命中
+    300073: '飞缘魔', 300034: '蚌精', 300019: '火灵',
+    # 两件套：效果抵抗
+    300049: '幽谷响', 300039: '返魂香', 300033: '骰子鬼', 300008: '魍魉之匣',
+    # 固有属性
+    300077: '鬼灵歌伎', 300054: '蜃气楼', 300053: '地震鲶', 300052: '荒骷髅',
+    300051: '胧车', 300050: '土蜘蛛'
+}  # 全部御魂类型（截至当前版本，43 种，排序为游戏内御魂类型列表顺序）
+KINDS_NAME = tuple(KINDS.values())  # 请勿用索引来取特定值，索引会随版本御魂增加而变动
+KINDS_NAME_SGL = (KINDS[300077], KINDS[300054], KINDS[300053], KINDS[300052],
+                  KINDS[300051], KINDS[300050])
 
 ATTRS = (
     '生命', '防御', '攻击',
     '生命加成', '防御加成', '攻击加成',
     '速度', '暴击', '暴击伤害',
     '效果命中', '效果抵抗'
-)  # 全部属性
+)  # 全部属性（排序为游戏内属性整理列表顺序）
 
 POS = ('壹', '贰', '叁', '肆', '伍', '陆')  # 御魂位置
 
@@ -153,12 +173,28 @@ ATTRS_SUB = {
 }  # 一至六星御魂副属性初始值 / 加点值、加点系数范围、可读化
 
 ATTRS_DBL = {
-    ATTRS[3]: (0.15, KINDS[15:23], '(两){} {:.0%}'),
-    ATTRS[4]: (0.3, KINDS[23:30], '(两){} {:.0%}'),
-    ATTRS[5]: (0.15, KINDS[:8], '(两){} {:.0%}'),
-    ATTRS[7]: (0.15, KINDS[8:15], '(两){} {:.0%}'),
-    ATTRS[9]: (0.15, KINDS[30:33], '(两){} {:.0%}'),
-    ATTRS[10]: (0.15, KINDS[33:37], '(两){} {:.0%}'),
+    ATTRS[3]: (0.15, [
+        KINDS[300076], KINDS[300024], KINDS[300021], KINDS[300015],
+        KINDS[300014], KINDS[300009], KINDS[300006], KINDS[300003]
+    ], '(两){} {:.0%}'),
+    ATTRS[4]: (0.3, [
+        KINDS[300035], KINDS[300032], KINDS[300023], KINDS[300013],
+        KINDS[300011], KINDS[300010], KINDS[300002]
+    ], '(两){} {:.0%}'),
+    ATTRS[5]: (0.15, [
+        KINDS[300074], KINDS[300048], KINDS[300027], KINDS[300022],
+        KINDS[300020], KINDS[300018], KINDS[300012], KINDS[300004]
+    ], '(两){} {:.0%}'),
+    ATTRS[7]: (0.15, [
+        KINDS[300075], KINDS[300036], KINDS[300031], KINDS[300030],
+        KINDS[300029], KINDS[300026], KINDS[300007]
+    ], '(两){} {:.0%}'),
+    ATTRS[9]: (0.15, [
+        KINDS[300073], KINDS[300034], KINDS[300019]
+    ], '(两){} {:.0%}'),
+    ATTRS[10]: (0.15, [
+        KINDS[300049], KINDS[300039], KINDS[300033], KINDS[300008]
+    ], '(两){} {:.0%}'),
 }  # 非首领御魂两件套属性值、包含御魂、可读化
 
 ATTRS_SGL = {
@@ -270,7 +306,7 @@ def out_key(item):
     Returns:
         str: 返回 KEY
     """
-    return KINDS.index(item.split(' ', 2)[1]) * 10 + POS.index(item[1:2])
+    return KINDS_NAME.index(item.split(' ', 2)[1]) * 10 + POS.index(item[1:2])
 
 
 def score_attr(attr, star, value):
@@ -574,6 +610,63 @@ def meta_hdtr2std(item):
     return item_std
 
 
+def meta_hdtrnew2std(item):
+    """将「御魂导出器 for 新客户端」格式元数据重封装为标准格式
+
+    Args:
+        item (dict): 「御魂导出器」导出数据中单颗御魂的元数据
+
+    Returns:
+        dict: 标准格式的御魂元数据
+    """
+    attrs_id_name = {
+        'Hp': ATTRS[0], 'Defense': ATTRS[1], 'Attack': ATTRS[2],
+        'HpRate': ATTRS[3], 'DefenseRate': ATTRS[4], 'AttackRate': ATTRS[5],
+        'Speed': ATTRS[6], 'CritRate': ATTRS[7], 'CritPower': ATTRS[8],
+        'EffectHitRate': ATTRS[9], 'EffectResistRate': ATTRS[10]
+    }  # 「御魂导出器」属性 ID - 名字表
+    sgl_id_attr = {
+        0: {'attr': 'HpRate', 'value': 0.08},
+        0: {'attr': 'DefenseRate', 'value': 0.16},
+        0: {'attr': 'AttackRate', 'value': 0.08},
+        0: {'attr': 'CritRate', 'value': 0.08},
+        0: {'attr': 'EffectHitRate', 'value': 0.08},
+        0: {'attr': 'EffectResistRate', 'value': 0.08}
+    }
+    sgl_id_attr = {
+        2: ATTRS[3],
+        3: ATTRS[4],
+        1: ATTRS[5],
+        4: ATTRS[7],
+        5: ATTRS[9],
+        6: ATTRS[10]
+    }  # 「御魂导出器」固有属性 ID - 名字表
+    item_std = {
+        'id': item['id'],
+        'kind': KINDS[item['suit_id']],
+        'pos': item['pos'],
+        'star': item['quality'],
+        'level': item['level'],
+        'attrs': {
+            'main': [{
+                'attr': attrs_id_name[attr],
+                'value': value
+            } for attr, value in item['base_attr'].items()][0],
+            'subs': [{
+                'attr': attrs_id_name[attr],
+                'value': value
+            } for attr, value in item['rand_attr'].items()]
+        }
+    }
+    if item['single_attr'] in sgl_id_attr:
+        attr = sgl_id_attr[item['single_attr']]
+        item_std['attrs']['sgl'] = {
+            'attr': attr,
+            'value': ATTRS_SGL[attr][0]
+        }
+    return item_std
+
+
 def meta_fluxxu2std(item):
     """将「痒痒熊快照」格式元数据重封装为标准格式
 
@@ -583,23 +676,6 @@ def meta_fluxxu2std(item):
     Returns:
         dict: 标准格式的御魂元数据
     """
-    kinds_id_name = {
-        300074: KINDS[0], 300048: KINDS[1], 300027: KINDS[2],
-        300022: KINDS[3], 300020: KINDS[4], 300018: KINDS[5],
-        300012: KINDS[6], 300004: KINDS[7], 300075: KINDS[8],
-        300036: KINDS[9], 300031: KINDS[10], 300030: KINDS[11],
-        300029: KINDS[12], 300026: KINDS[13], 300007: KINDS[14],
-        300076: KINDS[15], 300024: KINDS[16], 300021: KINDS[17],
-        300015: KINDS[18], 300014: KINDS[19], 300009: KINDS[20],
-        300006: KINDS[21], 300003: KINDS[22], 300035: KINDS[23],
-        300032: KINDS[24], 300023: KINDS[25], 300013: KINDS[26],
-        300011: KINDS[27], 300010: KINDS[28], 300002: KINDS[29],
-        300073: KINDS[30], 300034: KINDS[31], 300019: KINDS[32],
-        300049: KINDS[33], 300039: KINDS[34], 300033: KINDS[35],
-        300008: KINDS[36], 300077: KINDS[37], 300054: KINDS[38],
-        300053: KINDS[39], 300052: KINDS[40], 300051: KINDS[41],
-        300050: KINDS[42]
-    }  # 「痒痒熊快照」御魂 ID - 名字表
     attrs_id_name = {
         'Hp': ATTRS[0], 'Defense': ATTRS[1], 'Attack': ATTRS[2],
         'HpRate': ATTRS[3], 'DefenseRate': ATTRS[4], 'AttackRate': ATTRS[5],
@@ -608,7 +684,7 @@ def meta_fluxxu2std(item):
     }  # 「痒痒熊快照」属性 ID - 名字表
     item_std = {
         'id': item['id'],
-        'kind': kinds_id_name[item['suit_id']],
+        'kind': KINDS[item['suit_id']],
         'pos': item['pos'] + 1,
         'star': item['quality'],
         'level': item['level'],
@@ -704,6 +780,18 @@ def check_data_hdtr(data):
     return data and isinstance(data, list) and data[0] == 'yuhun_ocr2.0'
 
 
+def check_data_hdtr_new(data):
+    """检查 JSON 数据是否为「御魂导出器 for 新客户端」数据
+
+    Args:
+        data (dict): JSON 数据
+
+    Returns:
+        bool: 合法返回 True
+    """
+    return data and isinstance(data, dict) and 'equip_data' in data
+
+
 def check_data_fluxxu(data):
     """检查 JSON 数据是否为「痒痒熊快照」数据
 
@@ -751,6 +839,33 @@ def extract_data_hdtr(data):
     return list(map(meta_hdtr2std, data[1:]))
 
 
+def extract_data_hdtr_new(data):
+    """从「御魂导出器 for 新客户端」数据中抽取御魂数据集并封装为标准格式
+
+    阴阳师官方于 2020-08 全面更新了新引擎版，使得「御魂导出器」等一众民间工具失效。
+    NGA@火电太热 于 9 月对新版本桌面版进行了适配，发布了新的「御魂导出器」。
+    相较于旧版「御魂导出器」的简略数据，新版的数据更详实，
+    且数据格式参考了 NGA@fluxxu 的「痒痒熊快照」。
+    整个数据文件封装为 dict：
+        {
+            'ocr_info': {'version': 4.2}
+            'user_info': {...},
+            'equip_drawers': [...],
+            'equip_data': [...]
+        }
+    御魂数据在 equip_data。
+
+    Args:
+        data (dict): 「御魂导出器」导出文件的 JSON 数据
+
+    Returns:
+        list: 返回封装为标准格式的御魂数据集
+    """
+    if not check_data_hdtr_new(data):
+        return []
+    return list(map(meta_hdtrnew2std, data['equip_data']))
+
+
 def extract_data_fluxxu(data):
     """从「痒痒熊快照」数据中抽取御魂数据集并封装为标准格式
 
@@ -774,7 +889,6 @@ def extract_data_fluxxu(data):
         list: 返回封装为标准格式的御魂数据集
     """
     if not check_data_fluxxu(data):
-        print(log('无法识别的「痒痒熊快照」数据内容', 'error'))
         return []
     return list(map(meta_fluxxu2std, data['data']['hero_equips']))
 
@@ -802,7 +916,6 @@ def extract_data_cbg(data):
         list: 返回封装为标准格式的御魂数据集
     """
     if not check_data_cbg(data):
-        print(log('无法识别的藏宝阁数据内容', 'error'))
         return []
     data_game = json.loads(
         data['equip']['equip_desc']
@@ -845,6 +958,49 @@ def pick_dwarf_hdtr(data, data_f):
     o = DWARF_FILE % pe
     with open(o, 'w', encoding='utf-8') as f:  # 按源格式导出
         data_out = [data[0]] + out_s
+        json.dump(data_out, f)
+        print(log('已将结果导出 \'%s\'' % path.basename(o), 'info'))
+    o = DWARF_FILE % (pe[0], '.txt')
+    with open(o, 'w', encoding='utf-8') as f:  # 可读化导出
+        f.write('\n\n'.join(sorted(out_r, key=out_key)))
+        print(log('已将结果导出 \'%s\'' % path.basename(o), 'info'))
+    input(log('输入任意字符于此展开全部结果：', 'input'))
+    print('\n' + '\n\n'.join(sorted(out_r, key=out_key)) + '\n')
+
+
+def pick_dwarf_hdtr_new(data, data_f):
+    """从「御魂导出器 for 新客户端」数据检出低收益御魂
+
+    Args:
+        data (dict): 「御魂导出器」导出文件的 JSON 数据
+        data_f (str): 「御魂导出器」导出文件的路径
+    """
+    data_yuhun = extract_data_hdtr_new(data)
+    if not data_yuhun:
+        print(log('无法识别的「御魂导出器 for 新客户端」数据内容', 'error'))
+        return
+    print(log('已检测到数据文件来自「御魂导出器 for 新客户端」', 'info'))
+    out_s, out_r = [], []  # 检出结果集（源格式、标准格式）
+    for i, item in enumerate(data_yuhun):
+        if not dwarf(item)['result']:  # 跳过非低收益御魂
+            continue
+        out_s.append(data['equip_data'][i])
+        t = translate(item, with_up=True)
+        out_r.append(t)
+        if not run_as_exe():  # 非 EXE 运行不输出进度
+            continue
+        print(log('已检出 %d 颗低收益御魂：%s%s' % (
+            len(out_r), t.split('\n', 1)[0], ' ' * 7
+        ), 'info'), end='\r')
+        time.sleep(0.016)
+    print(log('已检出 %d 颗低收益御魂%s' % (len(out_r), ' ' * 19), 'info'))
+    if not out_r:  # 未检出御魂则不导出结果
+        return
+    pe = path.splitext(data_f)
+    o = DWARF_FILE % pe
+    with open(o, 'w', encoding='utf-8') as f:  # 按源格式导出
+        data_out = copy.deepcopy(data)
+        data_out['equip_data'] = out_s
         json.dump(data_out, f)
         print(log('已将结果导出 \'%s\'' % path.basename(o), 'info'))
     o = DWARF_FILE % (pe[0], '.txt')
@@ -1000,7 +1156,7 @@ def parse_rule(path_or_url, dir_prior, dir_prog):
     print(log('本程序目录 \'%s\'' % dir_prog, 'info'))
     generate_def_rule(dir_prog)
     RULES.clear()
-    kinds_ruled = {kind: False for kind in KINDS}
+    kinds_ruled = {kind: False for kind in KINDS_NAME}
     data_rules = read_rule_data(path_or_url, dir_prior, dir_prog)
     for rule in filter(lambda x: x.strip() and not x.startswith('#'),
                        data_rules.split('\n')):
@@ -1069,7 +1225,7 @@ def generate_def_rule(dir_prog):
         for rule in def_rules():
             f.write('    [御魂]-[位置]-[主属性]：%s，%d\n# ' %
                     ('、'.join(rule['attrs']), rule['score']))
-        for kind in KINDS:
+        for kind in KINDS_NAME:
             f.write('\n# %s\n%s：默认' % (kind, kind))
 
 
@@ -1214,7 +1370,9 @@ def main():
                    path.dirname(path.abspath(sys.argv[0])))
         with open(data_file, 'r', encoding='utf-8') as f:
             obj = json.loads(f.read())
-            if check_data_hdtr(obj):  # 按「御魂导出器」数据处理
+            if check_data_hdtr_new(obj):  # 按「御魂导出器 for 新客户端」数据处理
+                pick_dwarf_hdtr_new(obj, data_file)
+            elif check_data_hdtr(obj):  # 按「御魂导出器」数据处理
                 pick_dwarf_hdtr(obj, data_file)
             elif check_data_fluxxu(obj):  # 按「痒痒熊快照」数据处理
                 pick_dwarf_fluxxu(obj, data_file)

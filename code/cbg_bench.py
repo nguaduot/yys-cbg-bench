@@ -4,14 +4,11 @@
 # 号来
 # 阴阳师藏宝阁衍生小工具，用于提取游戏帐号数据要点并生成报告。
 #
-# TODO: 仍在开发中，未正式发布
-#
 # 了解更多请前往 GitHub 查看项目：https://github.com/nguaduot/yys-cbg-bench
 #
 # author: @nguaduot 痒痒鼠@南瓜多糖
-# version: 1.0.200817
-# date: 20200817
-
+# version: 1.6.210128
+# date: 20210128
 
 import datetime
 import getopt
@@ -30,13 +27,12 @@ from urllib import request
 
 from modules import output
 from modules import pick_dwarf
-from modules import yh_suit
-
+from modules import yhsuit
 
 PROG = 'yys-cbg-bench'
 AUTH = 'nguaduot'
-VER = '1.0'
-VERSION = '1.0.200817'
+VER = '1.6'
+VERSION = '1.6.210128'
 REL = 'github.com/nguaduot/yys-cbg-bench'
 COPYRIGHT = '%s v%s @%s %s' % (PROG, VERSION, AUTH, REL)
 HELP = (
@@ -48,30 +44,36 @@ HELP = (
     '\n+ 若未指定 -u, 程序会读取未知参数, 若也无未知参数, 不启动程序'
     '\n+ 不带任何参数也可启动程序, 会有参数输入引导',
     '输出结果:',
-    '售价: ¥{售价} {天数}天 !{若不满级则显示提示} '
+    '{上架中/已售出/已取回/未上架}: ¥{售价，公示期/已取回状态将提示“!”} {签到天数}天 '
+    '!{若不满级则显示等级提示} '
     '!{若检测到合服则显示提示, 多服合一无法获知归属服, 需留心}'
     '\n  金币 {金币} '
     '黑蛋 {\'御行达摩\'数量+推测已消耗量(据此可了解练度)} '
     '体力 {体力} '
     '勾玉 {勾玉} '
     '蓝票 {神秘的符咒+现世符咒} '
-    '御札 {御札/金御札}'
-    '\n  庭院: 初语谧景 + {除初始之外的其他庭院}'
-    '\n  部分成就: {风姿度, 据此可了解外观向收集量(皮肤/头像框等)} '
+    '御札 {御札/金御札} '
+    '魂玉 {留存魂玉数量, 大于0时显示}'
+    '\n  关键成就: {风姿度, 据此可了解外观向收集量(皮肤/头像框等)} '
     '{成就点数, 5000+可报名特邀测试} {已达成的最高非酋成就} {探索关卡的妖怪是否全部发现}',
     '图鉴SP&SSR式神: {\'500天未收录SSR\'未使用则显示} {\'999天未收录SP\'未使用则显示}'
-    '\n  未拥有式神: {未拥有SP数量}+{未拥有SSR数量}'
+    '\n  当下未拥有式神...{提示除联动的最新SP/SSR式神}: '
+    '{于当下版本的未拥有SP数量}+{于当下版本的未拥有SSR数量}'
     '\n    SP碎片收集: '
     '{未拥有式神(图鉴已点亮也可能未拥有, 需留心)} {该式神碎片量, 据此可知有无碗} ...'
     '\n    SSR碎片收集: '
     '{未拥有式神(图鉴已点亮也可能未拥有, 需留心)} {该式神碎片量, 据此可知有无碗} ...'
-    '\n  部分多号机拥有情况: {式神} {该式神拥有数量} ...',
+    '\n  关键多号机拥有情况: {式神} {该式神拥有数量} ...',
     '联动式神拥有&碎片收集情况:'
     '\n  {联动期数}: {该期式神} '
     '{拥有数量(低稀有度低星式神无法获知)}/{碎片量(低稀有度式神无法获知)} ...'
     '\n  ...',
-    '六星/满级/六星满级御魂: {藏宝阁未提供未满级御魂数据, 因此六星御魂数量无法查到}/'
-    '{各星级满级御魂总量}/{六星满级御魂数量}'
+    '已收集皮肤: {曜之阁已开启则显示}'
+    '\n  庭院: 初语谧景 + {除初始之外的其他庭院} ...'
+    '\n  氪金典藏...{提示最新皮肤}: {已收集的氪金式神典藏皮肤数量}'
+    '\n    {皮肤名} ...',
+    '六星满级/满级/六星御魂: {六星满级御魂数量}/{各星级满级御魂总量}/'
+    '{藏宝阁未提供未满级御魂数据, 因此六星御魂总量无法查到, 请知悉}/'
     '\n  满级普通御魂: {满级非首领御魂数量}'
     '\n    {两件套属性} {该类御魂数量}'
     '\n    ...'
@@ -111,37 +113,44 @@ HELP = (
     '\'痒痒鼠, 烤机不?\''
 )
 
-
+# TODO: 以下常量需留意随版本更新而检查更新
 HERO_RARITY = ['', 'N', 'R', 'SR', 'SSR', 'SP']  # 式神稀有度
 HEROES_X = {
     '第一期': {'奴良陆生': 4},
     '第二期': {'卖药郎': 4},
     '第三期': {'鬼灯': 4, '阿香': 3, '蜜桃&芥子': 2},
     '第四期': {'犬夜叉': 4, '杀生丸': 4, '桔梗': 4},
-    '第五期': {'黑崎一护': 4, '朽木露琪亚': 3}
+    '第五期': {'黑崎一护': 4, '朽木露琪亚': 3},
+    '第六期': {'灶门炭治郎': 4, '灶门祢豆子': 4}
 }  # 各期联动式神及其稀有度
 HEROES_ABBR = {
+    # 联动
+    '奴良陆生': '陆生',
+    '蜜桃&芥子': '蜜桃',
+    '黑崎一护': '一护',
+    '朽木露琪亚': '露琪亚',
+    '灶门炭治郎': '炭治郎',
+    '灶门祢豆子': '祢豆子',
+    # SP
     '少羽大天狗': '小天狗',
     '炼狱茨木童子': '茨林',
     '稻荷神御馔津': '神御',
     '苍风一目连': '苍连',
     '赤影妖刀姬': '赤刀',
-    '御怨般若': '御怨般若',
     '骁浪荒川之主': '浪川',
     '烬天玉藻前': '烬',
     '鬼王酒吞童子': '鬼吞',
     '天剑韧心鬼切': '奶切',
     '聆海金鱼姬': '大金鱼',
-    '浮世青行灯': '浮世青灯',
-    '缚骨清姬': '缚骨清姬',
+    '浮世青行灯': '大灯',
+    '待宵姑获鸟': '大姑',
+    '麓铭大岳丸': '鹿丸',
+    '夜溟彼岸花': '夜溟花',
+    # SSR
     '酒吞童子': '酒吞',
     '荒川之主': '荒川',
     '茨木童子': '茨木',
-    '八岐大蛇': '大蛇',
-    '奴良陆生': '陆生',
-    '蜜桃&芥子': '蜜桃',
-    '黑崎一护': '一护',
-    '朽木露琪亚': '露琪亚',
+    '八岐大蛇': '大蛇'
 }  # 尽量不超过四个字, 使用 HEROES_ABBR.get(x, x) 取值而非 HEROES_ABBR[x]
 YUHUN_ABBR = {
     '涅槃之火': '涅槃',
@@ -156,6 +165,24 @@ ATTR_ABBR = {
     '效果命中': '命中',
     '效果抵抗': '抵抗'
 }  # 使用 ATTR_ABBR.get(x, x) 取值而非 ATTR_ABBR[x]
+RMB_HERO_SKINS = {
+    '神宫金社': -1,  # 荒（限定活动获取）
+    '青莲蜕梦': 128,  # 玉藻前
+    '响魂醉曲': 128,  # 酒吞
+    '蝶步韶华': 128,  # 不知火
+    # '冷宴狐影': 0,  # 烬（已回炉未上架）
+    '花引冥烛': 128,  # 彼岸花
+    '古桥水巷': 128,  # 椒图
+    '永夜无眠': 168,  # 泷夜叉姬
+    '化烟': 108,  # 清姬
+    # '胧月': 0,  # 辉夜姬（非氪金，为百绘罗衣作品，通过活动获取）
+    '金鳞航梦': 148,  # 铃鹿御前
+    '紫藤花烬': 108,  # 姑获鸟
+    '锦羽金鹏': 128,  # 小天狗
+    '琥珀龙魂': 148,  # 大岳丸
+    '百鬼夜行': 148,  # 烬
+    '福鲤霓裳': 188  # 缘结神
+}  # 氪金式神皮肤（一般为“典藏”，且附赠同名头像框）
 HEROES_PANEL = {
     '炼狱茨木童子': {
         '攻击': 3323.2, '防御': 379.26, '生命': 10253.8,
@@ -180,11 +207,14 @@ USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
               ' Chrome/84.0.4147.89 Safari/537.36')
 
 SERVER = {}  # 区服, 用以检测多服合一
+HERO = {}  # 式神，用以检测全图鉴
 DATA_SOURCE = {}  # 商品源数据
 DATA_RESULT = []  # 分析结果
 
 lock = threading.Lock()
-thread_fetch_config: Thread = None
+thread_fetch_config = None
+
+callback_cio = None  # 回调方法
 
 
 def save(url_equip):
@@ -193,10 +223,12 @@ def save(url_equip):
         os.mkdir(dir_cbg)
     if not DATA_SOURCE:
         return
+    # 删除 Windows 文件名中不允许出现的字符, 以及无法正常显示且会导致 IO 异常的控制字符
+    # 使用当前卖家角色昵称 equip_name，而非 seller_name，其会随买家再次上架而改变
     seller = re.sub(
         r'[\\/:?"<>|\u0000-\u001F\u007F-\u009F]', '',
-        DATA_SOURCE['equip']['seller_name']
-    )  # 删除 Windows 文件名中不允许出现的字符, 以及无法正常显示且会导致 IO 异常的控制字符
+        DATA_SOURCE['equip']['equip_name']
+    )
     t = datetime.datetime.strptime(DATA_SOURCE['equip']['create_time'],
                                    '%Y-%m-%d %H:%M:%S')
     file_base = path.join(dir_cbg, 'cbg_%s_%s_%s_%s' % (
@@ -210,19 +242,17 @@ def save(url_equip):
     file_result = '%s_bench%s.json' % (file_base, '_lite' if LITE else '')
     file_result_2 = '%s_bench%s.txt' % (file_base, '_lite' if LITE else '')
     file_result_3 = '%s_bench%s.png' % (file_base, '_lite' if LITE else '')
-    if path.isfile(file_source):
-        cio('源数据已存在 \'%s\'' % path.basename(file_source), 'info')
-    else:
-        with open(file_source, 'w', encoding='utf-8') as f:
-            json.dump(DATA_SOURCE, f)
-        cio('已保存源数据 \'%s\'' % path.basename(file_source), 'info')
-    if path.isfile(file_fluxxu):
-        cio('痒痒熊快照格式数据已存在 \'%s\'' % '*_yyx_snapshot.json', 'info')
-    else:
-        data_fluxxu = data_cbg2fluxxu(DATA_SOURCE, url_equip)
-        with open(file_fluxxu, 'w', encoding='utf-8') as f:
-            json.dump(data_fluxxu, f)
-        cio('已保存痒痒熊快照格式数据 \'%s\'' % '*_yyx_snapshot.json', 'info')
+    # if path.isfile(file_source):
+    #     cio('源数据已存在 \'%s\'' % path.basename(file_source), 'info')
+    with open(file_source, 'w', encoding='utf-8') as f:
+        json.dump(DATA_SOURCE, f)
+    cio('已保存源数据 \'%s\'' % path.basename(file_source), 'info')
+    # if path.isfile(file_fluxxu):
+    #     cio('痒痒熊快照格式数据已存在 \'%s\'' % '*_yyx_snapshot.json', 'info')
+    data_fluxxu = data_cbg2fluxxu(DATA_SOURCE, url_equip)
+    with open(file_fluxxu, 'w', encoding='utf-8') as f:
+        json.dump(data_fluxxu, f)
+    cio('已保存痒痒熊快照格式数据 \'%s\'' % '*_yyx_snapshot.json', 'info')
     if not DATA_RESULT:
         return
     with open(file_result, 'w', encoding='utf-8') as f:
@@ -231,13 +261,13 @@ def save(url_equip):
     with open(file_result_2, 'w', encoding='utf-8') as f:
         f.write('\n'.join([item['out'] for item in DATA_RESULT]))
     cio('已保存分析结果 \'*_%s\'' % file_result_2.rsplit('_', 1)[1], 'info')
-    if output.pil_exists() and output.font_exists():
+    if output.enabled():
         output.text2img(file_result_3, [item['out'] for item in DATA_RESULT],
                         head=path.basename(file_result_3), foot=COPYRIGHT)
         cio('已保存分析结果 \'*_%s\'' % file_result_3.rsplit('_', 1)[1], 'info')
         view(file_result_3)
     else:
-        cio('字体缺失, 未将结果生成图片 \'*_%s\''
+        cio('\'PIL\'库或字体缺失, 未将结果生成图片 \'*_%s\''
             % file_result_3.rsplit('_', 1)[1], 'warn')
 
 
@@ -360,10 +390,13 @@ def bench_inventory(data, data_game):
         }  # 探索·百鬼
     }  # 成就
     data_damo = data_game['damo_count_dict']
-    data_yard = data_game['skin']['yard']  # 不会包含默认庭院皮肤
-    data_achieves = data_game['achieve_ids']  # 成就
+    data_achieve = data_game.get(
+        'achieve_ids', []
+    )  # 成就（注意，早期藏宝阁未包含该数据）
     result = {
         'data': {
+            'status': data['equip']['status'],
+            'pass_fair_show': data['equip']['pass_fair_show'] == 1,
             'price': data['equip']['price'],  # 售价(单位: 分)
             'days': data_game['sign_days'],  # 签到天数
             'lv': data_game['lv'],  # 等级
@@ -371,24 +404,23 @@ def bench_inventory(data, data_game):
             'gouyu':  data_game['goyu'],  # 勾玉
             'smdfz': data_game['gameble_card'],  # 蓝票(源数据拼写错误)
             'xsfz': data_game['ar_gamble_card'],  # 紫票
-            # 'hunyu': data_game['hunyu'],  # 魂玉
             'strength':  data_game['strength'],  # 体力
             'yuzha':  data_game['soul_jade'],  # 御札
             'yuzha_gold': data_game['currency_900188'],  # 金御札
+            'hunyu': data_game['hunyu'],  # 魂玉
             'damo_yx': sum(
                 [num for damoes in data_damo.values()
                  for damo, num in damoes.items() if damo == '411']
             ),  # 黑蛋
             'damo_yx_cost': infer_damo_yx_cost(data_game),  # 已消耗黑蛋量
             'servers': [data['equip']['server_name']],  # 服务器
-            'yards': [item[1] for item in data_yard],  # 庭院
             'achieves': []  # 成就
         },
-        'out': '售价:'
+        'out': ''
     }
     for achieve in achieves.values():
         for achieve_id in list(achieve)[::-1]:
-            if achieve_id in data_achieves:
+            if achieve_id in data_achieve:
                 result['data']['achieves'].append(achieve[achieve_id])
                 break
         else:
@@ -396,7 +428,20 @@ def bench_inventory(data, data_game):
     thread_fetch_config.join()  # 等待区服列表抓取完毕
     if data['equip']['serverid'] in SERVER:
         result['data']['servers'] = list(SERVER[data['equip']['serverid']])
-    result['out'] += ' ¥%.0f' % (result['data']['price'] / 100)
+    if result['data']['status'] == 2:
+        result['out'] = '上架中: '
+        if not result['data']['pass_fair_show']:
+            result['out'] += '!'
+    elif result['data']['status'] == 3:  # 被下单
+        result['out'] = '上架中: '
+    elif result['data']['status'] == 0:
+        result['out'] = '已取回: '
+        result['out'] += '!'
+    elif result['data']['status'] == 6:
+        result['out'] = '已售出: '
+    else:
+        result['out'] = '未上架:'
+    result['out'] += '¥%.0f' % (result['data']['price'] / 100)
     result['out'] += ' %d天' % result['data']['days']
     if result['data']['lv'] < 60:
         result['out'] += ' !%d级' % result['data']['lv']
@@ -414,65 +459,88 @@ def bench_inventory(data, data_game):
         result['data']['yuzha'],
         result['data']['yuzha_gold']
     )
-    result['out'] += '\n  庭院: 初语谧景 + %s' % ' '.join(result['data']['yards'])
-    result['out'] += '\n  部分成就:'
+    if result['data']['hunyu']:  # 仅在留存魂玉未消耗完时显示
+        result['out'] += ' 魂玉 %d' % result['data']['hunyu']
+    result['out'] += '\n  关键成就:'
     for achieve in result['data']['achieves']:
         result['out'] += ' %s' % achieve['name']
     return result
 
 
 def bench_heroes(data):
-    heroes_sp = set([info[0] for info in data['hero_history']['sp'].values()
-                     if type(info) is list])
-    heroes_ssr = set([info[0] for info in data['hero_history']['ssr'].values()
-                     if type(info) is list])
+    # 全部式神列表有以下 v1 v2 两种获取方法：
+    # v2 从 game_auto_config.json 接口获取（更新并不及时）
+    # v1 获取的式神列表仅代表上架时的图鉴情况，而非当下版本，即不会包含后续新出式神
+    thread_fetch_config.join()  # 等待式神列表抓取完毕
+    heroes_x_v2 = [hero for heroes in HEROES_X.values() for hero in heroes]
+    heroes_sp_ssr_v2 = [name for hid, name in sorted(
+        {**HERO[5], **HERO[4]}.items()
+    ) if name not in heroes_x_v2]  # 按发布时间升序排列
+    heroes_sp_v2 = [name for hid, name in sorted(HERO[5].items())
+                    if name not in heroes_x_v2]  # 按发布时间升序排列
+    heroes_ssr_v2 = [name for hid, name in sorted(HERO[4].items())
+                     if name not in heroes_x_v2]  # 按发布时间升序排列
+    # heroes_sp_ssr_v1 = [info[0] for hid, info in sorted(
+    #     {**data['hero_history']['sp'], **data['hero_history']['ssr']}.items()
+    # ) if type(info) is list]
+    # heroes_sp_v1 = [info[0] for hid, info in sorted(
+    #     data['hero_history']['sp'].items()
+    # ) if type(info) is list]
+    # heroes_ssr_v1 = [info[0] for hid, info in sorted(
+    #     data['hero_history']['ssr'].items()
+    # ) if type(info) is list]
     data_heroes = list(data['heroes'].values())
-    data_sp_ssr = [item for item in data_heroes
+    data_sp_ssr = [item['name'] for item in data_heroes
                    if item['rarity'] == 5 or item['rarity'] == 4]
     data_fragments_sp_ssr = list(data['hero_fragment'].values())
     data_fragments_sp_ssr = {
         item['name']: item['num'] for item in data_fragments_sp_ssr
     }
-    heroes_sp_lost = heroes_sp - {
-        item['name'] for item in data_sp_ssr if item['rarity'] == 5
-    }
-    heroes_ssr_lost = heroes_ssr - {
-        item['name'] for item in data_sp_ssr if item['rarity'] == 4
-    }
+    # heroes_sp_ssr_lost = [hero for hero in heroes_sp_ssr_v2
+    #                       if hero not in data_sp_ssr]
+    heroes_sp_lost = [hero for hero in heroes_sp_v2
+                      if hero not in data_sp_ssr]
+    heroes_ssr_lost = [hero for hero in heroes_ssr_v2
+                       if hero not in data_sp_ssr]
     result = {'data': {
-        'sp': {hero: 0 for hero in heroes_sp_lost},
-        'ssr': {hero: 0 for hero in heroes_ssr_lost},
+        'sp': heroes_sp_v2,
+        'ssr': heroes_ssr_v2,
+        'sp_lost': {hero: 0 for hero in heroes_sp_lost},
+        'ssr_lost': {hero: 0 for hero in heroes_ssr_lost},
         'multi': {
             '烬天玉藻前': 0, '鬼王酒吞童子': 0,
-            '酒吞童子': 0, '玉藻前': 0, '八岐大蛇': 0, '不知火': 0, '云外镜': 0,
-        },
+            '酒吞童子': 0, '玉藻前': 0, '八岐大蛇': 0, '不知火': 0,
+        },  # TODO: 需留意随版本更新而检查更新
         'ssr_coin': data['ssr_coin'] == 1,  # 「500天未收录SSR」是否还未使用
-        'sp_coin': data['sp_coin'] == 1  # 「999天未收录SP」是否还未使用
+        'sp_coin': data.get(
+            'sp_coin', 0
+        ) == 1  # 「999天未收录SP」是否还未使用（注意，早期藏宝阁未包含该数据）
     }, 'out': '图鉴SP&SSR式神:'}
-    for hero in result['data']['sp']:
-        result['data']['sp'][hero] = data_fragments_sp_ssr.get(hero, 0)
-    for hero in result['data']['ssr']:
-        result['data']['ssr'][hero] = data_fragments_sp_ssr.get(hero, 0)
+    for hero in result['data']['sp_lost']:
+        result['data']['sp_lost'][hero] = data_fragments_sp_ssr.get(hero, 0)
+    for hero in result['data']['ssr_lost']:
+        result['data']['ssr_lost'][hero] = data_fragments_sp_ssr.get(hero, 0)
     for hero in result['data']['multi']:
         result['data']['multi'][hero] = len(
-            [item for item in data_sp_ssr if item['name'] == hero]
+            [item for item in data_sp_ssr if item == hero]
         )
     if result['data']['ssr_coin']:
         result['out'] += ' 500SSR'
     if result['data']['sp_coin']:
         result['out'] += ' 999SP'
-    result['out'] += '\n  未拥有式神: %d+%d' % (
+    result['out'] += '\n  当下未拥有式神...%s: %d+%d' % (
+        HEROES_ABBR.get(heroes_sp_ssr_v2[-1], heroes_sp_ssr_v2[-1]),
         len(heroes_sp_lost), len(heroes_ssr_lost)
-    )
+    )  # 显示最新式神，便于自行判断数据时效性
     if heroes_sp_lost:
         result['out'] += '\n    SP碎片收集:'
-        for hero, num in result['data']['sp'].items():
+        for hero, num in result['data']['sp_lost'].items():
             result['out'] += ' %s %d' % (HEROES_ABBR.get(hero, hero), num)
     if heroes_ssr_lost:
         result['out'] += '\n    SSR碎片收集:'
-        for hero, num in result['data']['ssr'].items():
+        for hero, num in result['data']['ssr_lost'].items():
             result['out'] += ' %s %d' % (HEROES_ABBR.get(hero, hero), num)
-    result['out'] += '\n  部分多号机拥有情况:'
+    result['out'] += '\n  关键多号机拥有情况:'
     for hero, num in result['data']['multi'].items():
         result['out'] += ' %s %d' % (HEROES_ABBR.get(hero, hero), num)
     return result
@@ -526,18 +594,55 @@ def bench_heroes_x(data):
     return result
 
 
-def bench_yuhuns(data):
+def bench_skins(data):
+    data_skin_yard = data['skin']['yard']  # 不会包含默认庭院皮肤
+    data_skin_hero = [item[1] for item in data['skin']['ss']]
+    result = {
+        'data': {
+            'yzg': data['yzg'],  # 曜之阁
+            'skin_yards': [item[1] for item in data_skin_yard],  # 庭院
+            'skin_heroes': {name: rmb for name, rmb in RMB_HERO_SKINS.items()
+                            if name in data_skin_hero},  # 氪金式神皮肤
+        },
+        'out': '已收集皮肤:'
+    }
+    if result['data']['yzg']['open']:  # 曜之阁已开启
+        result['out'] += ' 曜之阁'
+    result['out'] += '\n  庭院: 初语谧景'
+    if result['data']['skin_yards']:
+        result['out'] += ' + %s' % ' '.join(result['data']['skin_yards'])
+    result['out'] += '\n  氪金典藏...%s: %d' % (
+        list(RMB_HERO_SKINS.keys())[-1], len(result['data']['skin_heroes'])
+    )  # 显示最新皮肤，便于自行判断数据时效性
+    if result['data']['skin_heroes']:
+        result['out'] += '\n    %s' % ' '.join(result['data']['skin_heroes'])
+    # result['out'] += '\n  氪金典藏:\n    '
+    # for name, rmb in result['data']['skin_heroes'].items():
+    #     result['out'] += (
+    #             ' %s ¥%d' % (name, rmb)
+    #     ) if rmb >= 0 else (
+    #             ' %1s ¥-' % name
+    #     )
+    return result
+
+
+def bench_yuhuns(data_game, data_yuhun):
     kinds_expand = {'狂骨', '破势', '招财猫', '蚌精', '鬼灵歌伎', '荒骷髅'}
-    data_15 = [item for item in data if item['level'] == 15]
+    total = data_game['equips_summary']  # 全星级全等级御魂总数
+    # level_15 = data_game['level_15']  # 满级御魂数
+    data_15 = [item for item in data_yuhun if item['level'] == 15]
     data_15_6 = [item for item in data_15 if item['star'] == 6]
     result = {
         'data': {
+            'total': total,
             'level_15': len(data_15),
             'level_15_star_6': len(data_15_6),
             'attr_dbl': {},
             'attr_sgl': {}
         },
-        'out': '六星/满级/六星满级御魂: -/%d/%d' % (len(data_15), len(data_15_6))
+        'out': '六星满级/满级/六星御魂: %d/%d/<=%d' % (
+            len(data_15_6), len(data_15), total
+        )
     }
     for attr_dbl, preset in pick_dwarf.ATTRS_DBL.items():
         result['data']['attr_dbl'][attr_dbl] = {}
@@ -545,7 +650,7 @@ def bench_yuhuns(data):
             result['data']['attr_dbl'][attr_dbl][kind] = len(
                 [item for item in data_15 if item['kind'] == kind]
             )
-    for kind in pick_dwarf.KINDS[37:43]:
+    for kind in pick_dwarf.KINDS_NAME_SGL:
         result['data']['attr_sgl'][kind] = len(
             [item for item in data_15 if item['kind'] == kind]
         )
@@ -617,9 +722,9 @@ def bench_speed(data):
                                 + x[1]['subs2'].get(a1, 0) if x[1] else 0)),
               reverse=True)
     suit[0][1], suit[1][1] = suit[0][0], suit[1][0]
-    result['data'][0]['value'] = yh_suit.gross([items[0] for items in suit], a1)
+    result['data'][0]['value'] = yhsuit.gross([items[0] for items in suit], a1)
     result['data'][1]['suit'] = [items[1] for items in suit]
-    result['data'][1]['value'] = yh_suit.gross(result['data'][1]['suit'], a1)
+    result['data'][1]['value'] = yhsuit.gross(result['data'][1]['suit'], a1)
     result['out'] = '散一速: +{:.2f} 招财 +{:.2f}'.format(
         result['data'][0]['value'], result['data'][1]['value']
     )
@@ -698,8 +803,8 @@ def bench_zs_htz(data):
     }  # 属性限制
     damage_threshold = ((0, sys.maxsize),)  # 攻暴要求
     acc = (3, 1, 3, 1, 3, 1)  # 加速设置
-    suit = yh_suit.cal(data, panel_base, suits42, attrs246,
-                       attrs_threshold, damage_threshold, acc)
+    suit = yhsuit.cal(data, panel_base, suits42, attrs246,
+                      attrs_threshold, damage_threshold, acc)
     return '  %s: 真蛇超星小小黑 针歌 %s' % (
         '这个没问题' if suit else '可能做不了', ''.join(map(str, acc))
     )
@@ -718,11 +823,11 @@ def bench_k28_cl(data):
     damage_threshold = ((15815, sys.maxsize),)  # 攻暴要求
     damage_threshold_alt = ((15723, sys.maxsize),)
     acc = (3, 1, 3, 1, 3, 1)  # 加速设置
-    suit = yh_suit.cal(data, panel_base, suits42, attrs246,
-                       attrs_threshold, damage_threshold, acc)
+    suit = yhsuit.cal(data, panel_base, suits42, attrs246,
+                      attrs_threshold, damage_threshold, acc)
     if not suit:
-        suit = yh_suit.cal(data, panel_base, suits42_alt, attrs246,
-                           attrs_threshold, damage_threshold_alt, acc)
+        suit = yhsuit.cal(data, panel_base, suits42_alt, attrs246,
+                          attrs_threshold, damage_threshold_alt, acc)
     return '  %s: 困28超星茨林 破荒/破歌 %s' % (
         '这个没问题' if suit else '可能做不了', ''.join(map(str, acc))
     )
@@ -739,8 +844,8 @@ def bench_j10_cl(data):
     }  # 属性限制
     damage_threshold = ((15390, 15443), (15810, sys.maxsize))  # 攻暴要求
     acc = (5, 2, 5, 4, 5, 3)  # 加速设置
-    suit = yh_suit.cal(data, panel_base, suits42, attrs246,
-                       attrs_threshold, damage_threshold, acc)
+    suit = yhsuit.cal(data, panel_base, suits42, attrs246,
+                      attrs_threshold, damage_threshold, acc)
     return '  %s: 觉10高速茨林 破荒 %s' % (
         '这个没问题' if suit else '可能做不了', ''.join(map(str, acc))
     )
@@ -759,11 +864,11 @@ def bench_h10_yzq(data):
     damage_threshold = ((15696, 20090),)  # 攻暴要求
     damage_threshold_alt = ((17843, 20090),)
     acc = (5, 3, 5, 4, 5, 3)  # 加速设置
-    suit = yh_suit.cal(data, panel_base, suits42, attrs246,
-                       attrs_threshold, damage_threshold, acc)
+    suit = yhsuit.cal(data, panel_base, suits42, attrs246,
+                      attrs_threshold, damage_threshold, acc)
     if not suit:
-        suit = yh_suit.cal(data, panel_base, suits42_alt, attrs246,
-                           attrs_threshold, damage_threshold_alt, acc)
+        suit = yhsuit.cal(data, panel_base, suits42_alt, attrs246,
+                          attrs_threshold, damage_threshold_alt, acc)
     return '  %s: 魂10高速玉藻前 狂荒/破荒 %s' % (
         '这个没问题' if suit else '可能做不了', ''.join(map(str, acc))
     )
@@ -780,8 +885,8 @@ def bench_k28_yzq(data):
     }  # 属性限制
     damage_threshold = ((21644, sys.maxsize),)  # 攻暴要求
     acc = (6, 5, 6, 5, 6, 4)  # 加速设置
-    suit = yh_suit.cal(data, panel_base, suits42, attrs246,
-                       attrs_threshold, damage_threshold, acc)
+    suit = yhsuit.cal(data, panel_base, suits42, attrs246,
+                      attrs_threshold, damage_threshold, acc)
     return '  %s: 困28超星玉藻前 破荒 %s' % (
         '这个没问题' if suit else '可能做不了', ''.join(map(str, acc))
     )
@@ -833,7 +938,10 @@ def bench():
     result_paragraph = bench_heroes_x(data_game)
     DATA_RESULT.append(result_paragraph)
     cio(result_paragraph['out'])
-    result_paragraph = bench_yuhuns(data_yuhun_std)
+    result_paragraph = bench_skins(data_game)
+    DATA_RESULT.append(result_paragraph)
+    cio(result_paragraph['out'])
+    result_paragraph = bench_yuhuns(data_game, data_yuhun_std)
     DATA_RESULT.append(result_paragraph)
     cio(result_paragraph['out'])
     result_paragraph = bench_speed(data_yuhun_std)
@@ -877,28 +985,30 @@ def fetch_severs():
             SERVER[server[0]] = {server[1]}
 
 
-# def fetch_heroes():
-#     url_heroes = 'https://cbg-yys.res.netease.com/js/game_auto_config.js'
-#     req = request.Request(url=url_heroes, headers={
-#         'User-Agent': USER_AGENT
-#     })
-#     data = request.urlopen(req, timeout=5).read().decode('utf-8')
-#     r = re.search(r'({.+})', data)
-#     if not r:
-#         return
-#     data = json.loads(r.group(1))
-#     for hero in data['hero_list']:
-#         # [200, '桃花妖', 3, 'taohuayao']
-#         # 200：式神 ID
-#         # 3：稀有度(5 SP 4 SSR 3 SR 2 R 1 N + 呱 + 素材)
-#         if hero[2] in HEROES:
-#             HEROES[hero[2]][hero[0]] = hero[1]
-#         else:
-#             HEROES[hero[2]] = {hero[0]: hero[1]}
+def fetch_heroes():
+    global HERO
+    url_heroes = 'https://cbg-yys.res.netease.com/js/game_auto_config.js'
+    req = request.Request(url=url_heroes, headers={
+        'User-Agent': USER_AGENT
+    })
+    data = request.urlopen(req, timeout=5).read().decode('utf-8')
+    r = re.search(r'({.+})', data)
+    if not r:
+        return
+    data = json.loads(r.group(1))
+    for hero in data['hero_list']:
+        # [200, '桃花妖', 3, 'taohuayao']
+        # 200：式神 ID
+        # 3：稀有度(5 SP 4 SSR 3 SR 2 R 1 N + 呱 + 素材)
+        if hero[2] in HERO:
+            HERO[hero[2]][hero[0]] = hero[1]
+        else:
+            HERO[hero[2]] = {hero[0]: hero[1]}
 
 
 def fetch_config():
     fetch_severs()
+    fetch_heroes()
 
 
 def fetch_data(url_player):
@@ -1043,7 +1153,7 @@ def data_cbg2fluxxu(data, url):
         'player': {
             'id': 0,  # TODO: 非 data_core['equipid']
             'server_id': 0,  # TODO: 非 data_core['serverid']
-            'name': data_core['equip_name'],  # TODO: 游戏名 or 卖家名？
+            'name': data_core['equip_name'],  # 当前卖家角色昵称
             'level': data_core['equip_level']  # 等级
         },
         'currency': {
@@ -1124,9 +1234,15 @@ def cio(content, tag=None, input_or_print=False):
         else:
             if type(content) in (tuple, list, set):
                 for piece in content:
-                    print(pick_dwarf.log(piece, tag) if tag else piece)
+                    out = pick_dwarf.log(piece, tag) if tag else piece
+                    print(out)
+                    if callback_cio:
+                        callback_cio(out)
             else:
-                print(pick_dwarf.log(content, tag) if tag else content)
+                out = pick_dwarf.log(content, tag) if tag else content
+                print(out)
+                if callback_cio:
+                    callback_cio(out)
     finally:
         lock.release()
 
@@ -1138,24 +1254,27 @@ def view(file):
 
 
 def check_modules():
-    if not output.pil_exists():
+    try:
+        import PIL
+    except ModuleNotFoundError:
         cio('\'PIL\'库缺失, 图片生成功能已禁用 \'pip install pillow\'', 'warn')
 
 
 def parse_args(args):
     global LITE
+    LITE = False
     try:
         opts, args = getopt.getopt(
             args, 'hvlu:', ['help', 'version', 'lite', 'url=']
         )
     except getopt.GetoptError:
-        opts, args = [('-h', '')], []
+        opts, args = [('--undefined', '')], []
     url_player, helped = None, False
     for opt, value in opts:
         if opt in ('-h', '--help'):
             cio(COPYRIGHT)
             cio('\n'.join(HELP))
-            if output.pil_exists() and output.font_exists():
+            if output.enabled():
                 file_save = '%s_help.png' % path.splitext(
                     path.abspath(sys.argv[0])
                 )[0]
@@ -1178,8 +1297,11 @@ def parse_args(args):
     return url_player
 
 
-def main():
-    global thread_fetch_config, LITE
+def main(callback=None):
+    global thread_fetch_config
+    global LITE
+    global callback_cio
+    callback_cio = callback
     thread_fetch_config = Thread(target=fetch_config)
     thread_fetch_config.start()
     if len(sys.argv) > 1:
@@ -1198,13 +1320,17 @@ def main():
     fetch_data(url_equip)
     bench()
     save(url_equip)
-    if pick_dwarf.run_as_exe():  # 避免窗口一闪而逝
-        os.system('pause')
 
 
 if __name__ == '__main__':
-    # 由于使用 pyinstaller 打包 EXE 后运行机制发生变化, 多进程代码会异常
-    # 添加该行代码使 multiprocessing 模块能正常工作
+    # 由于使用 PyInstaller 打包 EXE 后运行机制发生变化，多进程代码会异常，
+    # 添加该行代码使 multiprocessing 模块能正常工作。
     # https://github.com/pyinstaller/pyinstaller/wiki/Recipe-Multiprocessing
     multiprocessing.freeze_support()
-    main()
+    try:
+        main()
+    except Exception:
+        raise
+    finally:
+        if pick_dwarf.run_as_exe():  # 避免窗口一闪而逝
+            os.system('pause')
