@@ -13,9 +13,11 @@
 
 生成报告：[完整结果](sample/cbg_中国区-iOS_夏之蝉_南瓜多糖_20210122225748_bench.png) | [精简结果](sample/cbg_中国区-iOS_夏之蝉_南瓜多糖_20210122225748_bench_lite.png)
 
+> 「号来」同时发布到 NGA 论坛阴阳师板块：https://nga.178.com/read.php?tid=23005018，可回复交流。
+
 ### 依赖
 
-**号来**使用 Python3 编写，依赖的第三方库：
+「号来」使用 Python3 编写，依赖的第三方库：
 
 ```
 pip install pillow
