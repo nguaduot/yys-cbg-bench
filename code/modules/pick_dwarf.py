@@ -733,8 +733,15 @@ def meta_cbg2std(item):
         (ATTRS[6], ATTRS[8], ATTRS[9]),
         (ATTRS[7], ATTRS[10])
     )  # 源数据 base_rindex 键对应的全部属性，结合 pos 键可确定主属性
-    attr_m = list(set(ATTRS_POS[item['pos'] - 1])
-                  & set(attrs_base_r[item['base_rindex']]))[0]
+    
+    attr_m = ''
+    attr_m_intersection = list(set(ATTRS_POS[item['pos'] - 1])
+                      & set(attrs_base_r[item['base_rindex']]))
+    if len(attr_m_intersection) > 0:
+        attr_m = attr_m_intersection[0]
+    else:
+        attr_m = ATTRS[item['base_rindex']]
+        
     item_std = {
         'id': item['uuid'],
         'kind': item['name'],
